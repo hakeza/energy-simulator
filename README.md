@@ -1,12 +1,18 @@
-# Energy Simulator v3
+# Energy Simulator v4
 
-Telegram Mini App front-end.
+Telegram Mini App frontend.
 
-- Главная
-- Игры → Upgrader (Crash удалён)
-- Задания
-- Профиль
-- Дизайнерская полка 3×3
-- 4 кнопки нижней навигации в одном ряду
+Changes:
+- Upgrader has only green success zone + gray fail zone.
+- Failed upgrade leaves an empty gray result field.
+- Removed Upgrader teaser from the Home page.
+- Home shelf is a designer display shelf for future energy drinks.
+- Starting energy is 0 (no automatic 1000 points).
+- Profile now contains Deposit / Withdraw UI with CryptoBot and xRocket provider selection.
+- Four bottom navigation buttons stay in one row.
 
-Для GitHub Pages положите `index.html`, `style.css`, `app.js` в корень репозитория.
+## Crypto payments
+The frontend intentionally does not contain provider API tokens. Real CryptoBot and xRocket deposits/withdrawals must be connected through a secure backend.
+
+CryptoBot: Crypto Pay API supports invoices and payouts/transfers.
+xRocket: xRocket Pay API supports payment/withdrawal functionality.
