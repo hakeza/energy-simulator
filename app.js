@@ -1,17 +1,123 @@
-const tg=window.Telegram?.WebApp;if(tg){tg.ready();tg.expand();tg.setHeaderColor?.('#070a07');tg.setBackgroundColor?.('#050705')}
-const state={page:'home',balance:0,gamesPlayed:0,wins:0,angle:0,provider:'cryptobot'};
-const app=document.getElementById('app'),balance=document.getElementById('balance'),toast=document.getElementById('toast');
-const money=n=>new Intl.NumberFormat('ru-RU').format(Math.max(0,Math.floor(n)));
-function setBalance(){balance.textContent=money(state.balance)}
+const tg=window.Telegram?.WebApp;
+if(tg){tg.ready();tg.expand();tg.setHeaderColor?.('#070b07');tg.setBackgroundColor?.('#050805')}
+const ADMIN_ID=8179254915;
+const state={
+  page:'home', balance:0, gamesPlayed:0, wins:0, provider:'xrocket',
+  chance:70, multiplier:2, stake:50, rotation:0,
+  user:(tg?.initDataUnsafe?.user)||null
+};
+const app=document.getElementById('app'), balanceEl=document.getElementById('balance'), toast=document.getElementById('toast');
+const money=n=>new Intl.NumberFormat('ru-RU').format(Math.max(0,Math.floor(Number(n)||0)));
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 function notify(t){toast.textContent=t;toast.classList.add('show');clearTimeout(notify.t);notify.t=setTimeout(()=>toast.classList.remove('show'),1800)}
-function head(title,sub){return `<div class="page-head"><h1>${title}</h1><p>${sub}</p></div>`}
-function render(){setBalance();document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.page===state.page));({home,games,tasks,profile}[state.page]||home)()}
-function home(){app.innerHTML=`${head('Главное меню','Твоя коллекция энергетиков')}<section class="hero"><div class="eyebrow">ENERGY COLLECTION</div><h2>Собирай. <span class="lime">Выставляй.</span></h2><p>Собирай энергетики и ставь любимые банки на свою дизайнерскую витрину.</p></section><div class="section-title"><span>Моя витрина</span><em>0 / 9</em></div><section class="display-shelf"><span class="shelf-side left"></span><span class="shelf-side right"></span><div class="shelf-top"></div>${[1,2,3].map(r=>`<div class="shelf-row"><div class="empty-bay"><span class="shelf-label">место</span></div><div class="empty-bay"><span class="shelf-label">место</span></div><div class="empty-bay"><span class="shelf-label">место</span></div></div>`).join('')}<div class="shelf-feet"><span></span><span></span></div><div class="shelf-caption">DESIGNER ENERGY DISPLAY</div></section>`}
-function games(){app.innerHTML=`${head('Игры','Испытай удачу')}<section class="card game-card"><div class="game-left"><div class="game-icon">↑</div><div><h3>Upgrader</h3><p>Улучши энергетик, попав стрелкой в зелёную зону.</p></div></div><button class="primary" id="openUpgrade">Играть</button></section><div id="upgradeMount"></div>`;document.getElementById('openUpgrade').onclick=openUpgrader}
-function openUpgrader(){const m=document.getElementById('upgradeMount');m.innerHTML=`<section class="card upgrader"><div class="upgrade-head"><b>UPGRADER</b><div class="chance" id="chanceLabel">70%</div></div><div class="wheel-wrap"><div class="wheel" id="wheel" style="--success-angle:252deg"><div class="wheel-inner"><div class="wheel-core"><div class="arrows"><span>⌃</span><span>⌃</span></div></div></div></div><div class="pointer"></div></div><div class="upgrade-items"><div class="item"><div class="can">🥤</div><b>Energy Basic</b><small>×1.0</small></div><div class="arrow">➜</div><div class="item empty-result" id="targetItem"><div class="can">▱</div><b>Результат</b><small>пусто</small></div></div><div class="controls"><div class="amount"><span>Шанс успеха</span><input id="chance" type="range" min="10" max="90" value="70"><b id="chanceValue">70%</b></div><button class="primary" id="upgradeBtn">⚡ Апгрейд · 50</button><button class="primary" id="maxBtn">MAX</button></div><div class="result muted" id="result">Готов к апгрейду</div></section>`;const c=document.getElementById('chance'),cv=document.getElementById('chanceValue'),cl=document.getElementById('chanceLabel');c.oninput=()=>{cv.textContent=c.value+'%';cl.textContent=c.value+'%';document.getElementById('wheel').style.setProperty('--success-angle',`${c.value*3.6}deg`)};document.getElementById('maxBtn').onclick=()=>{c.value=90;c.oninput()};document.getElementById('upgradeBtn').onclick=doUpgrade;m.scrollIntoView({behavior:'smooth',block:'start'})}
-function doUpgrade(){const btn=document.getElementById('upgradeBtn'),wheel=document.getElementById('wheel'),result=document.getElementById('result'),target=document.getElementById('targetItem'),chance=+document.getElementById('chance').value;if(state.balance<50){result.className='result gray';result.textContent='Нужно 50 ⚡ для апгрейда';notify('Недостаточно энергии');return}state.balance-=50;state.gamesPlayed++;setBalance();btn.disabled=true;btn.textContent='Крутим...';result.className='result muted';result.textContent='Колесо вращается...';const success=Math.random()*100<chance;const successAngle=chance*3.6;const targetAngle=success?Math.random()*Math.max(1,successAngle-4)+2:successAngle+Math.random()*Math.max(1,360-successAngle-2)+1;state.angle+=1080+(360-targetAngle);wheel.style.transform=`rotate(${state.angle}deg)`;setTimeout(()=>{btn.disabled=false;btn.textContent='⚡ Апгрейд · 50';if(success){state.wins++;target.className='item';target.innerHTML='<div class="can">⚡</div><b>Energy Pro</b><small>×2.0</small>';result.className='result';result.textContent='АПГРЕЙД УСПЕШЕН';notify('Апгрейд успешен')}else{target.className='item empty-result';target.innerHTML='<div class="can">▱</div><b>Пусто</b><small>результата нет</small>';result.className='result gray';result.textContent='Неудача — результат пустой';notify('Неудача — выпало пустое поле')}},3250)}
-function walletModal(mode){document.querySelector('.modal')?.remove();const dep=mode==='deposit';document.body.insertAdjacentHTML('beforeend',`<div class="modal" id="walletModal"><div class="modal-card"><div class="modal-title"><h3>${dep?'Пополнить баланс':'Вывести средства'}</h3><button class="close" id="closeModal">×</button></div><div class="provider-row"><button class="provider ${state.provider==='cryptobot'?'active':''}" data-provider="cryptobot">CryptoBot</button><button class="provider ${state.provider==='xrocket'?'active':''}" data-provider="xrocket">xRocket</button></div><div class="field"><label>Сумма USDT</label><input id="walletAmount" type="number" min="1" step="0.01" placeholder="10"></div>${!dep?'<div class="field"><label>Реквизит для вывода</label><input id="walletAddress" placeholder="Адрес / username / реквизит"></div>':''}<div class="wallet-status">${dep?'Реальный платёж создаётся через серверный API выбранного провайдера.':'Заявка на вывод отправляется на сервер для проверки и исполнения.'}</div><div class="modal-actions"><button class="wallet-btn" id="cancelWallet">Отмена</button><button class="primary" id="submitWallet">${dep?'Продолжить':'Отправить заявку'}</button></div></div></div>`);document.querySelectorAll('[data-provider]').forEach(b=>b.onclick=()=>{state.provider=b.dataset.provider;document.querySelectorAll('[data-provider]').forEach(x=>x.classList.toggle('active',x.dataset.provider===state.provider))});document.getElementById('closeModal').onclick=closeWallet;document.getElementById('cancelWallet').onclick=closeWallet;document.getElementById('submitWallet').onclick=()=>{const amount=+document.getElementById('walletAmount').value;if(!amount||amount<=0){notify('Укажи сумму');return}if(!dep&&!document.getElementById('walletAddress').value.trim()){notify('Укажи реквизит');return}notify(`${dep?'Пополнение':'Вывод'} через ${state.provider==='cryptobot'?'CryptoBot':'xRocket'} — API подключим на сервере`);closeWallet()}}
-function closeWallet(){document.querySelector('.modal')?.remove()}
-function tasks(){app.innerHTML=`${head('Задания','Выполняй задания и получай энергию')}<section class="tasks"><div class="card task"><div><strong>Открыть Upgrader</strong><small>Награда: ⚡ 100</small></div><button class="primary" onclick="notify('Задание будет подключено')">Забрать</button></div><div class="card task"><div><strong>Сделать 3 апгрейда</strong><small>Награда: ⚡ 250</small></div><button class="primary" onclick="notify('Сначала сыграй 3 раза')">Проверить</button></div></section>`}
-function profile(){const wr=state.gamesPlayed?Math.round(state.wins/state.gamesPlayed*100):0;app.innerHTML=`${head('Профиль','Баланс, пополнение и вывод')}<section class="card profile-head"><div class="avatar">⚡</div><div><div class="eyebrow">ИГРОК</div><h2 style="margin:0;font-size:20px">Energy Hunter</h2><small class="muted">Telegram Mini App</small></div></section><section class="card wallet-card"><div class="section-title" style="margin:0"><span>Кошелёк</span><em>USDT</em></div><div class="wallet-actions"><button class="wallet-btn" id="depositBtn">＋ Пополнить</button><button class="wallet-btn" id="withdrawBtn">↗ Вывести</button></div><div class="provider-row"><button class="provider ${state.provider==='cryptobot'?'active':''}" data-provider-view="cryptobot">CryptoBot</button><button class="provider ${state.provider==='xrocket'?'active':''}" data-provider-view="xrocket">xRocket</button></div><div class="wallet-note">Оба провайдера уже добавлены в интерфейс. Для реальных платежей нужен сервер: API-ключи нельзя хранить в GitHub Pages / браузере.</div></section><div class="stat-grid"><div class="stat"><b>⚡ ${money(state.balance)}</b><span>Баланс</span></div><div class="stat"><b>${state.gamesPlayed}</b><span>Апгрейдов</span></div><div class="stat"><b>${state.wins}</b><span>Успешных</span></div><div class="stat"><b>${wr}%</b><span>Винрейт</span></div></div>`;document.getElementById('depositBtn').onclick=()=>walletModal('deposit');document.getElementById('withdrawBtn').onclick=()=>walletModal('withdraw');document.querySelectorAll('[data-provider-view]').forEach(b=>b.onclick=()=>{state.provider=b.dataset.providerView;profile()})}
-document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>{state.page=b.dataset.page;render()}));render();
+function setBalance(){balanceEl.textContent=money(state.balance)}
+function head(t,s){return `<div class="page-head"><h1>${t}</h1><p>${s}</p></div>`}
+async function api(path,opts={}){
+  if(!tg?.initData) throw new Error('Открой приложение через Telegram');
+  const r=await fetch(path,{...opts,headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData,...(opts.headers||{})}});
+  if(!r.ok){let x={};try{x=await r.json()}catch{};throw new Error(x.error||'Ошибка сервера')}
+  return r.json();
+}
+async function syncUser(){
+  if(!tg?.initData) return;
+  try{const d=await api('/api/me',{method:'POST',body:JSON.stringify({})});state.balance=d.user.balance||0;state.gamesPlayed=d.user.gamesPlayed||0;state.wins=d.user.wins||0;state.user=d.user;setBalance()}catch(e){}
+}
+function nav(){document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.page===state.page))}
+function render(){nav();setBalance();({home,games,tasks,profile}[state.page]||home)()}
+function home(){
+  const rows=[0,1,2].map(()=>`<div class="shelf-level"><div class="shelf-board"></div>${[0,1,2].map(()=>`<div class="slot empty"></div>`).join('')}</div>`).join('');
+  app.innerHTML=`${head('Главное меню','Твоя коллекция энергетиков')}
+  <section class="card hero"><div class="eyebrow">ENERGY COLLECTION</div><h2>Собирай. <span class="lime">Выставляй.</span></h2>
+  <p>Получай энергетики и выставляй их на своей дизайнерской витрине.</p></section>
+  <div class="section-title"><span>Моя витрина</span><em>0 / 9</em></div>
+  <section class="display-shelf"><div class="shelf-frame"></div><div class="shelf-crown"></div>${rows}
+  <div class="shelf-feet"><span></span><span></span></div><div class="shelf-caption">DESIGNER ENERGY DISPLAY</div></section>`;
+}
+function games(){
+  app.innerHTML=`${head('Игры','Доступная игра')}
+  <section class="card game-card"><div class="game-left"><div class="game-icon">↑</div><div><h3>Upgrader</h3><p>Настрой X и шанс, затем попробуй улучшить предмет.</p></div></div>
+  <button class="primary" id="openUpgrade">Играть</button></section><div id="upgradeMount"></div>`;
+  document.getElementById('openUpgrade').onclick=openUpgrader;
+}
+function openUpgrader(){
+  const m=document.getElementById('upgradeMount');
+  m.innerHTML=`<section class="card upgrader">
+  <div class="upgrade-head"><div><b>UPGRADER</b><div class="muted" style="font-size:9px;margin-top:4px">X${state.multiplier.toFixed(2)} · шанс ${state.chance}%</div></div>
+  <div style="display:flex;align-items:center;gap:8px"><div class="chance" id="chanceLabel">${state.chance}%</div><button class="gear" id="gear">⚙</button></div></div>
+  <div class="wheel-wrap"><div class="wheel" id="wheel" style="--success-angle:${state.chance*3.6}deg"><div class="wheel-inner"><div class="wheel-core">
+  <div class="arrows"><span>⌃</span><span>⌃</span></div></div></div></div><div class="pointer"></div></div>
+  <div class="upgrade-items"><div class="item"><div class="can lime">E</div><b>Energy Basic</b><small>Ставка ${state.stake} ⚡</small></div><div class="arrow">➜</div>
+  <div class="item empty-result" id="targetItem"><div class="can">?</div><b>Результат</b><small>пусто</small></div></div>
+  <div class="controls"><div class="amount"><span>Шанс</span><input id="chance" type="range" min="1" max="95" value="${state.chance}"><b id="chanceValue">${state.chance}%</b></div>
+  <button class="primary" id="upgradeBtn">⚡ Апгрейд · ${state.stake}</button><button class="primary" id="maxBtn">MAX</button></div>
+  <div class="settings-panel" id="settings"><div class="settings-grid"><div class="field"><label>Множитель X</label><input id="multiplier" type="number" min="1.01" max="100" step="0.01" value="${state.multiplier}"></div>
+  <div class="field"><label>Шанс успеха %</label><input id="chanceSet" type="number" min="1" max="95" step="1" value="${state.chance}"></div></div>
+  <div class="settings-help">Настрой X (во сколько раз увеличивается предмет) и процент успеха. Чем выше X, тем меньше шанс обычно имеет смысл ставить.</div>
+  <button class="primary" id="saveSettings" style="width:100%;margin-top:9px">Сохранить настройки</button></div>
+  <div class="result muted" id="result">Готов к апгрейду</div></section>`;
+  const chance=document.getElementById('chance'), cv=document.getElementById('chanceValue'), cl=document.getElementById('chanceLabel'), wheel=document.getElementById('wheel');
+  const syncChance=()=>{state.chance=Math.max(1,Math.min(95,+chance.value||70));cv.textContent=state.chance+'%';cl.textContent=state.chance+'%';wheel.style.setProperty('--success-angle',state.chance*3.6+'deg')};
+  chance.oninput=syncChance;
+  document.getElementById('maxBtn').onclick=()=>{chance.value=95;syncChance()};
+  document.getElementById('gear').onclick=()=>document.getElementById('settings').classList.toggle('open');
+  document.getElementById('saveSettings').onclick=()=>{let x=Math.max(1.01,Math.min(100,+document.getElementById('multiplier').value||2));let c=Math.max(1,Math.min(95,+document.getElementById('chanceSet').value||70));state.multiplier=x;state.chance=c;chance.value=c;syncChance();openUpgrader();notify('Настройки сохранены')};
+  document.getElementById('upgradeBtn').onclick=doUpgrade;
+  m.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function doUpgrade(){
+  const btn=document.getElementById('upgradeBtn'),wheel=document.getElementById('wheel'),result=document.getElementById('result'),target=document.getElementById('targetItem');
+  if(state.balance<state.stake){result.className='result gray';result.textContent=`Нужно ${state.stake} ⚡ для апгрейда`;notify('Недостаточно баланса');return}
+  const chance=state.chance;const success=Math.random()*100<chance;const successAngle=chance*3.6;
+  const targetAngle=success?Math.random()*Math.max(1,successAngle-4)+2:successAngle+Math.random()*Math.max(1,360-successAngle-2)+1;
+  state.balance-=state.stake;state.gamesPlayed++;setBalance();btn.disabled=true;btn.textContent='Крутим...';result.className='result muted';result.textContent='Колесо вращается...';
+  state.rotation+=1080+(360-targetAngle);wheel.style.transform=`rotate(${state.rotation}deg)`;
+  setTimeout(async()=>{
+    btn.disabled=false;btn.textContent=`⚡ Апгрейд · ${state.stake}`;
+    if(success){state.wins++;target.className='item';target.innerHTML=`<div class="can blue">E+</div><b>Energy Pro</b><small>X${state.multiplier.toFixed(2)}</small>`;result.className='result';result.textContent=`АПГРЕЙД УСПЕШЕН · X${state.multiplier.toFixed(2)}`;notify('Апгрейд успешен')}
+    else{target.className='item empty-result';target.innerHTML='<div class="can">?</div><b>Пусто</b><small>результата нет</small>';result.className='result gray';result.textContent='Неудача — результат пустой';notify('Неудача — выпало пустое поле')}
+    try{await api('/api/game/upgrade',{method:'POST',body:JSON.stringify({success,stake:state.stake,chance,multiplier:state.multiplier})})}catch(e){}
+  },3200);
+}
+function tasks(){app.innerHTML=`${head('Задания','Раздел пока отключён')}<section class="card empty-page"><div class="empty-icon">◌</div><h2>Заданий пока нет</h2><p>Мы ещё не добавляли задания. Раздел оставлен пустым до появления первой системы заданий.</p></section>`}
+function getUser(){return state.user||tg?.initDataUnsafe?.user||{}}
+function avatarHtml(u){return u.photo_url?`<img class="avatar" src="${esc(u.photo_url)}" alt="">`:`<div class="avatar avatar-fallback">${esc((u.first_name||'E').slice(0,1).toUpperCase())}</div>`}
+async function profile(){
+  const u=getUser(),name=u.username?`@${u.username}`:(u.first_name||'Игрок'),id=u.id||'—';
+  const admin=u.id===ADMIN_ID;
+  app.innerHTML=`${head('Профиль','Данные берутся из Telegram')}
+  <section class="card profile-head">${avatarHtml(u)}<div><div class="eyebrow">TELEGRAM</div><h2 class="profile-name">${esc(name)}</h2><div class="profile-id">[${esc(id)}]</div></div></section>
+  <section class="card wallet-card"><div class="section-title" style="margin:0"><span>Кошелёк</span><em>USDT</em></div>
+  <div class="wallet-actions"><button class="wallet-btn" id="depositBtn">＋ Пополнить</button><button class="wallet-btn" id="withdrawBtn">↗ Вывести</button></div>
+  <div class="provider-row"><button class="provider ${state.provider==='cryptobot'?'active':''}" data-provider="cryptobot">CryptoBot</button><button class="provider ${state.provider==='xrocket'?'active':''}" data-provider="xrocket">xRocket</button></div>
+  <div class="wallet-note">После настройки backend кнопки создают реальные инвойсы и заявки на вывод. API-ключи хранятся только на сервере.</div></section>
+  <div class="stat-grid"><div class="stat"><b>⚡ ${money(state.balance)}</b><span>Баланс</span></div><div class="stat"><b>${state.gamesPlayed}</b><span>Апгрейдов</span></div><div class="stat"><b>${state.wins}</b><span>Успешных</span></div></div>
+  ${admin?`<section class="card admin-card"><div class="eyebrow">OWNER / ADMIN</div><h3>Панель владельца</h3><div class="muted" style="font-size:11px">ID ${ADMIN_ID}. Данные игроков доступны через backend.</div><div id="adminList" class="admin-list"><small class="muted">Загрузка...</small></div></section>`:''}`;
+  document.getElementById('depositBtn').onclick=()=>walletModal('deposit');document.getElementById('withdrawBtn').onclick=()=>walletModal('withdraw');
+  document.querySelectorAll('[data-provider]').forEach(b=>b.onclick=()=>{state.provider=b.dataset.provider;profile()});
+  if(admin)loadAdmin();
+}
+async function loadAdmin(){
+  const box=document.getElementById('adminList');try{const d=await api('/api/admin/users',{method:'GET'});box.innerHTML=d.users.length?d.users.slice(0,30).map(x=>`<div class="admin-user"><div><b>${esc(x.username||x.first_name||'Игрок')}</b><small>[${x.id}] · ${money(x.balance)} ⚡</small></div><small>${x.inventory?.length||0} предметов</small></div>`).join(''):'<small class="muted">Игроков пока нет</small>'}catch(e){box.innerHTML=`<small class="muted">${esc(e.message)}</small>`}
+}
+function walletModal(mode){
+  document.querySelector('.modal')?.remove();const dep=mode==='deposit';
+  document.body.insertAdjacentHTML('beforeend',`<div class="modal"><div class="modal-card"><div class="modal-title"><h3>${dep?'Пополнить баланс':'Вывести средства'}</h3><button class="close" id="closeModal">×</button></div>
+  <div class="provider-row"><button class="provider ${state.provider==='cryptobot'?'active':''}" data-p="cryptobot">CryptoBot</button><button class="provider ${state.provider==='xrocket'?'active':''}" data-p="xrocket">xRocket</button></div>
+  <div class="field" style="margin-top:10px"><label>Сумма USDT</label><input id="walletAmount" type="number" min="1" step="0.01" placeholder="10"></div>
+  ${!dep?'<div class="field" style="margin-top:10px"><label>Адрес / реквизит</label><input id="walletAddress" placeholder="USDT address"></div>':''}
+  <div class="wallet-status">${dep?'После отправки откроется страница оплаты выбранного провайдера.':'Вывод проверяется сервером и после проверки отправляется через выбранного провайдера.'}</div>
+  <div class="modal-actions"><button class="wallet-btn" id="cancel">Отмена</button><button class="primary" id="submit">${dep?'Создать инвойс':'Создать вывод'}</button></div></div></div>`);
+  document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{state.provider=b.dataset.p;walletModal(mode)});
+  document.getElementById('closeModal').onclick=closeModal;document.getElementById('cancel').onclick=closeModal;
+  document.getElementById('submit').onclick=async()=>{
+    const amount=+document.getElementById('walletAmount').value;if(!amount||amount<=0){notify('Укажи сумму');return}
+    if(!dep&&!document.getElementById('walletAddress').value.trim()){notify('Укажи адрес');return}
+    try{const body={provider:state.provider,amount};if(!dep)body.address=document.getElementById('walletAddress').value.trim();
+      const d=await api(dep?'/api/wallet/deposit':'/api/wallet/withdraw',{method:'POST',body:JSON.stringify(body)});
+      if(d.payUrl){tg?.openLink?.(d.payUrl);notify('Инвойс создан')}else notify(d.message||'Заявка создана');closeModal()
+    }catch(e){notify(e.message)}
+  };
+}
+function closeModal(){document.querySelector('.modal')?.remove()}
+document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>{state.page=b.dataset.page;render()}));
+syncUser().finally(render);

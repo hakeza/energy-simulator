@@ -1,12 +1,41 @@
-# Energy Simulator v5
+# Energy Simulator v6
 
-- 4 bottom navigation buttons in one row: Главная / Игры / Задания / Профиль.
-- Crash removed; Games contains Upgrader only.
-- Upgrader wheel uses only lime success zone and gray fail zone. No yellow/red zones.
-- On fail, result is an empty gray field.
-- Main menu has a designer display shelf, not a grid of cell cards.
-- Main menu has no Upgrader promo card.
-- Starting balance is 0.
-- Profile contains Deposit / Withdraw UI with CryptoBot and xRocket provider selection.
+## Что изменено
+- Upgrader: только салатовая зона успеха + серая зона проигрыша. Красной/жёлтой зон нет.
+- При проигрыше результат — пустое серое поле.
+- Дизайнерская витрина 3×3: предметы ставятся непосредственно на полки.
+- В главном меню нет карточки Upgrader.
+- Баланс нового игрока = 0.
+- Профиль получает фото, username и Telegram ID из Telegram Mini App.
+- Имя в профиле: `@username` (или имя, если username отсутствует), ID — в `[скобках]`.
+- В Upgrader есть ⚙ настройки: X-множитель и шанс в процентах.
+- Раздел «Задания» пока пустой: никаких заданий не добавлено.
+- Нижняя навигация: 4 объёмные кнопки в один ряд.
+- Владелец с Telegram ID 8179254915 получает admin-инструменты в backend и команду `/admin`.
 
-Important: real CryptoBot/xRocket payments require a secure server/backend. Never put provider API tokens in frontend JavaScript or GitHub Pages.
+## Важно про backend
+GitHub Pages подходит только для фронтенда. Для Telegram `/start`, `/admin`, хранения игроков и реальных депозитов/выводов нужен сервер.
+
+В папке `backend` (в этом архиве корень проекта) лежат:
+- `server.js`
+- `package.json`
+- `.env.example`
+
+### Запуск
+1. Установить Node.js 20+.
+2. В папке backend:
+   `npm install`
+3. Скопировать `.env.example` в `.env`.
+4. Заполнить `BOT_TOKEN`, `CRYPTO_PAY_TOKEN`, `XR_TOKEN`.
+5. `npm start`.
+
+### Telegram
+- `/start` показывает сообщение, что игра доступна только в приложении, и кнопку открытия Mini App.
+- `/admin` доступен только Telegram ID `8179254915`.
+- `/admin users` показывает игроков.
+- `/admin user ID` показывает баланс, апгрейды и количество предметов.
+
+### Платежи
+Ключи API нельзя хранить в `app.js` или GitHub Pages.
+CryptoBot invoice и xRocket invoice создаются backend-ом. Для xRocket используется Pay API.
+Для production обязательно настроить HTTPS webhooks и проверку подписи, идемпотентность событий и корректную обработку статусов/возвратов.
