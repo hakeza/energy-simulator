@@ -1,94 +1,34 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-  <meta name="theme-color" content="#080b0d">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0f0a" />
   <title>Energy Simulator</title>
+  <link rel="stylesheet" href="style.css" />
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="app">
+  <div class="app-shell">
     <header class="topbar">
       <div>
         <div class="eyebrow">ENERGY SIMULATOR</div>
-        <h1>Главное меню</h1>
+        <h1 id="pageTitle">Главное меню</h1>
       </div>
-      <div class="balance">
-        <span>⚡</span><b id="balance">0</b>
-      </div>
+      <div class="balance" id="balance">⚡ 1 000</div>
     </header>
 
-    <main>
-      <section class="shelf-card">
-        <div class="section-title">
-          <span>Моя полка</span>
-          <small>0 / 9</small>
-        </div>
-        <div class="shelf">
-          <div class="shelf-row">
-            <button class="slot empty" aria-label="Пустая ячейка">+</button>
-            <button class="slot empty">+</button>
-            <button class="slot empty">+</button>
-          </div>
-          <div class="shelf-row">
-            <button class="slot empty">+</button>
-            <button class="slot empty">+</button>
-            <button class="slot empty">+</button>
-          </div>
-          <div class="shelf-row">
-            <button class="slot empty">+</button>
-            <button class="slot empty">+</button>
-            <button class="slot empty">+</button>
-          </div>
-        </div>
-        <p class="hint">Здесь позже появятся собранные энергетики и другие предметы.</p>
-      </section>
+    <main id="app" class="content"></main>
 
-      <section class="games">
-        <div class="section-title"><span>Игры</span></div>
-        <button class="game-card" id="crashBtn">
-          <div class="game-icon">🚀</div>
-          <div class="game-info">
-            <strong>Crash</strong>
-            <span>Успей забрать выигрыш до падения множителя</span>
-          </div>
-          <span class="arrow">›</span>
-        </button>
-      </section>
-    </main>
-
-    <nav class="bottom-nav">
-      <button class="nav-item active">
-        <span>⌂</span><small>Главная</small>
-      </button>
-      <button class="nav-item" id="gamesNav">
-        <span>♠</span><small>Игры</small>
-      </button>
-      <button class="nav-item">
-        <span>♙</span><small>Профиль</small>
-      </button>
+    <nav class="bottom-nav" aria-label="Навигация">
+      <button class="nav-btn active" data-page="home"><span>⌂</span><b>Главное<br>Меню</b></button>
+      <button class="nav-btn" data-page="games"><span>◈</span><b>Игры</b></button>
+      <button class="nav-btn" data-page="tasks"><span>✓</span><b>Задания</b></button>
+      <button class="nav-btn" data-page="profile"><span>♙</span><b>Профиль</b></button>
     </nav>
   </div>
 
-  <div class="modal hidden" id="crashModal">
-    <div class="modal-card">
-      <button class="close" id="closeCrash">×</button>
-      <div class="crash-logo">CRASH</div>
-      <div class="multiplier" id="multiplier">1.00x</div>
-      <div class="crash-stage">
-        <div class="rocket">🚀</div>
-        <div class="grid-line"></div>
-      </div>
-      <div class="crash-actions">
-        <button class="primary" id="startCrash">Запустить</button>
-        <button class="secondary hidden" id="cashout">Забрать</button>
-      </div>
-      <div class="crash-result" id="crashResult">Тестовая версия — баланс пока не списывается.</div>
-    </div>
-  </div>
-
+  <div class="toast" id="toast"></div>
   <script src="app.js"></script>
 </body>
 </html>
