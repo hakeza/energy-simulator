@@ -1,6 +1,6 @@
 {
   "name":"energy-simulator-v6-backend",
-  "version":"6.0.0",
+  "version":"7.0.0",
   "private":true,
   "type":"commonjs",
   "scripts":{"start":"node server.js"},
