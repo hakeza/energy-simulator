@@ -15,7 +15,7 @@ const money=n=>new Intl.NumberFormat('ru-RU',{minimumFractionDigits:2,maximumFra
 const displayName=u=>[u?.first_name,u?.last_name].filter(Boolean).join(' ').trim()||'Игрок';
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 function notify(t){toast.textContent=t;toast.classList.add('show');clearTimeout(notify.t);notify.t=setTimeout(()=>toast.classList.remove('show'),1800)}
-function setBalance(){balanceEl.textContent=money(state.balance)}
+function setBalance(){balanceEl.textContent=`${money(state.balance)} USDT`}
 function head(t,s){return `<div class="page-head"><h1>${t}</h1><p>${s}</p></div>`}
 async function api(path,opts={}){
   if(!tg?.initData) throw new Error('Открой приложение через Telegram');
@@ -34,14 +34,12 @@ function home(){
   const rows=[0,1,2].map(()=>`<div class="shelf-level"><div class="shelf-board"></div>${[0,1,2].map(()=>`<div class="slot empty"></div>`).join('')}</div>`).join('');
   app.innerHTML=`${head('Главное меню','Твоя коллекция энергетиков')}
   <div class="section-title"><span>Моя витрина</span><em>0 / 9</em></div>
-  <section class="display-shelf"><div class="shelf-frame"></div><div class="shelf-crown"></div>${rows}
-  <div class="shelf-feet"><span></span><span></span></div><div class="shelf-caption">DESIGNER ENERGY DISPLAY</div></section>`;
+  <section class="display-shelf">${rows}
+  <div class="shelf-caption">@energydrinksim_bot</div></section>`;
 }
 function games(){
-  app.innerHTML=`${head('Игры','Доступная игра')}
-  <section class="card game-card"><div class="game-left"><div class="game-icon icon-upgrade">${icon('upgrade')}</div><div><h3>Upgrader</h3><p>Введи сумму и выбери множитель. Шанс подставится автоматически.</p></div></div>
-  <button class="primary" id="openUpgrade">Играть</button></section><div id="upgradeMount"></div>`;
-  document.getElementById('openUpgrade').onclick=openUpgrader;
+  app.innerHTML=`${head('Игры','Upgrader')}<div id="upgradeMount"></div>`;
+  openUpgrader();
 }
 function icon(name){
   const icons={
@@ -64,7 +62,7 @@ function openUpgrader(){
   <div class="upgrade-head"><div><b>UPGRADER</b><div class="muted" style="font-size:9px;margin-top:4px">Сумма в USDT · шанс и множитель рассчитываются автоматически</div></div>
   <button class="gear" id="gear" aria-label="Настройки" title="Настройки">⚙️</button></div>
   <div class="upgrade-summary"><span>Шанс <b id="chanceLabel">${state.chance}%</b></span><span>Множитель <b id="multiplierLabel">X${formatMultiplier(100/state.chance)}</b></span></div>
-  <div class="wheel-wrap"><div class="wheel" id="wheel" style="--success-angle:${state.chance*3.6}deg"><div class="wheel-inner"><div class="wheel-core"><div class="arrows"><span>⌃</span><span>⌃</span></div></div></div></div><div class="pointer"></div></div>
+  <div class="wheel-wrap"><div class="wheel" id="wheel" style="--success-start:${180-(state.chance*3.6)/2}deg;--success-end:${180+(state.chance*3.6)/2}deg"><div class="wheel-inner"><div class="wheel-core"><img class="upgrader-cat" src="cat.png" alt="" draggable="false"></div></div></div><div class="pointer"></div></div>
   <div class="upgrade-items"><div class="item"><div class="can lime">E</div><b>Energy Basic</b><small>Ставка в USDT</small></div><div class="arrow">➜</div>
   <div class="item empty-result" id="targetItem"><div class="can">?</div><b>Результат</b><small>пусто</small></div></div>
   <div class="controls"><div class="amount-input"><label>Сумма</label><div class="usdt-input"><input id="stake" type="number" min="0.01" step="0.01" value="${state.stake}"><span>USDT</span></div></div>
@@ -93,7 +91,7 @@ function openUpgrader(){
     const mult=100/state.chance;
     chanceLabel.textContent=`${formatPercent(state.chance)}%`;
     multiplierLabel.textContent=`X${formatMultiplier(mult)}`;
-    wheel.style.setProperty('--success-angle',state.chance*3.6+'deg');
+    wheel.style.setProperty('--success-start',(180-(state.chance*3.6)/2)+'deg');wheel.style.setProperty('--success-end',(180+(state.chance*3.6)/2)+'deg');
     document.querySelectorAll('.chance-btn').forEach(b=>{
       const key=b.dataset.type==='mult'?`x${b.dataset.value}`:`p${b.dataset.key}`;
       b.classList.toggle('active',key===state.choice);
@@ -146,9 +144,9 @@ async function profile(){
   const admin=Number(u.id)===ADMIN_ID;
   app.innerHTML=`${head('Профиль','Данные из Telegram')}
   <section class="card profile-head">${avatarHtml(u)}<div><div class="eyebrow">TELEGRAM</div><h2 class="profile-name">${esc(name)}</h2><div class="profile-id">${esc(username)} <span>[${esc(id)}]</span></div></div></section>
-  <section class="wallet-pair">
-    <div class="card profile-stat"><div class="profile-stat-top"><span>Депозиты</span><b>${money(state.depositsTotal)} USDT</b></div><button class="wallet-btn" id="depositBtn">＋ Пополнить</button></div>
-    <div class="card profile-stat"><div class="profile-stat-top"><span>Выводы</span><b>${money(state.withdrawalsTotal)} USDT</b></div><button class="wallet-btn" id="withdrawBtn">↗ Вывести</button></div>
+  <section class="card wallet-pair">
+    <div class="profile-stat"><div class="profile-stat-top"><span>Депозиты</span><b>${money(state.depositsTotal)} USDT</b></div><button class="wallet-btn" id="depositBtn">＋ Пополнить</button></div>
+    <div class="profile-stat"><div class="profile-stat-top"><span>Выводы</span><b>${money(state.withdrawalsTotal)} USDT</b></div><button class="wallet-btn" id="withdrawBtn">↗ Вывести</button></div>
   </section>
   <section class="profile-only-grid">
     <div class="card profile-stat"><div class="profile-stat-top"><span>Доход в минуту</span><b class="dash">—</b></div><small>Пока нет предметов, которые приносят доход.</small></div>
