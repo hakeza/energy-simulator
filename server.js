@@ -61,14 +61,21 @@ app.post('/api/me',auth,(req,res)=>{const u=userRecord(req.user);save();res.json
 app.get('/api/admin/users',auth,(req,res)=>{if(Number(req.user.id)!==ADMIN_ID)return res.status(403).json({error:'Forbidden'});res.json({users:Object.values(db.users)})});
 app.post('/api/game/upgrade',auth,(req,res)=>{
   const u=userRecord(req.user),s=numericAmount(req.body.stake);
-  const chance=Math.max(1,Math.min(95,Number(req.body.chance)||0));
-  const rawMultiplier=req.body.multiplier;
-  const numericMultiplier=Number(rawMultiplier);
-  const validMultiplier=[2,5,10].includes(numericMultiplier)?numericMultiplier:'custom';
+  const numericChance=Number(req.body.chance);
+  const numericMultiplier=Number(req.body.multiplier);
   if(!s||u.balance<s)return res.status(400).json({error:'Недостаточно средств'});
+  if(!Number.isFinite(numericChance)||numericChance<1||numericChance>95||!Number.isFinite(numericMultiplier)||numericMultiplier<=0){
+    return res.status(400).json({error:'Некорректные параметры шанса'});
+  }
+  const expectedChance=100/numericMultiplier;
+  if(Math.abs(expectedChance-numericChance)>0.01){
+    return res.status(400).json({error:'Шанс и множитель не соответствуют друг другу'});
+  }
+  const chance=numericChance;
+  const multiplier=numericMultiplier;
   const success=Math.random()*100<chance;
   u.balance=Number((Number(u.balance)-s).toFixed(6));u.gamesPlayed++;if(success)u.wins++;save();
-  res.json({success,chance,multiplier:validMultiplier,user:u});
+  res.json({success,chance,multiplier,user:u});
 });
 
 app.post('/api/wallet/deposit',auth,async(req,res)=>{
