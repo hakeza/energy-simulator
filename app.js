@@ -38,8 +38,19 @@ function home(){
   <div class="shelf-caption">@energydrinksim_bot</div></section>`;
 }
 function games(){
-  app.innerHTML=`${head('Игры','')}<div id="upgradeMount"></div>`;
-  openUpgrader();
+  app.innerHTML=`${head('Игры','Выбери игру')}
+  <section class="card game-card">
+    <div class="game-left">
+      <div class="game-icon">${icon('upgrade')}</div>
+      <div><h3>Upgrader</h3><p>Апгрейд предмета с выбором шанса и множителя.</p></div>
+    </div>
+    <button class="primary" id="openUpgraderBtn">Играть</button>
+  </section>
+  <div id="upgradeMount"></div>`;
+  document.getElementById('openUpgraderBtn').onclick=()=>{
+    document.getElementById('upgradeMount').scrollIntoView({behavior:'smooth',block:'start'});
+    openUpgrader();
+  };
 }
 function icon(name){
   const icons={
