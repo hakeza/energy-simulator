@@ -19,9 +19,9 @@ const app=express();
 app.use(cors());
 app.use(express.json());
 
-const emptyDb={users:{},invoices:{},withdrawals:{}};
+const emptyDb={users:{},invoices:{},withdrawals:{},gameRounds:{}};
 let db=emptyDb;
-try{db=fs.existsSync(DATA_FILE)?{...emptyDb,...JSON.parse(fs.readFileSync(DATA_FILE,'utf8'))}:emptyDb}catch{db=emptyDb}
+try{db=fs.existsSync(DATA_FILE)?{...emptyDb,...JSON.parse(fs.readFileSync(DATA_FILE,'utf8'))}:emptyDb;db.gameRounds=db.gameRounds||{}}catch{db=emptyDb}
 function save(){fs.writeFileSync(DATA_FILE,JSON.stringify(db,null,2))}
 function verifyTelegram(initData){
   if(!initData||!BOT_TOKEN)return null;
@@ -61,21 +61,31 @@ app.post('/api/me',auth,(req,res)=>{const u=userRecord(req.user);save();res.json
 app.get('/api/admin/users',auth,(req,res)=>{if(Number(req.user.id)!==ADMIN_ID)return res.status(403).json({error:'Forbidden'});res.json({users:Object.values(db.users)})});
 app.post('/api/game/upgrade',auth,(req,res)=>{
   const u=userRecord(req.user),s=numericAmount(req.body.stake);
-  const numericChance=Number(req.body.chance);
-  const numericMultiplier=Number(req.body.multiplier);
+  const requestedChance=Number(req.body.chance);
+  const requestId=String(req.body.requestId||'').trim();
+  if(!requestId||requestId.length>100)return res.status(400).json({error:'Некорректный идентификатор ставки'});
+  const existing=db.gameRounds[requestId];
+  if(existing){
+    if(Number(existing.telegramId)!==Number(u.id))return res.status(403).json({error:'Раунд принадлежит другому игроку'});
+    return res.json({success:existing.success,chance:existing.chance,multiplier:existing.multiplier,roll:existing.roll,payout:existing.payout||0,user:u,roundId:requestId,replayed:true});
+  }
   if(!s||u.balance<s)return res.status(400).json({error:'Недостаточно средств'});
-  if(!Number.isFinite(numericChance)||numericChance<1||numericChance>95||!Number.isFinite(numericMultiplier)||numericMultiplier<=0){
-    return res.status(400).json({error:'Некорректные параметры шанса'});
+  if(!Number.isFinite(requestedChance)||requestedChance<1||requestedChance>95){
+    return res.status(400).json({error:'Некорректный шанс'});
   }
-  const expectedChance=100/numericMultiplier;
-  if(Math.abs(expectedChance-numericChance)>0.01){
-    return res.status(400).json({error:'Шанс и множитель не соответствуют друг другу'});
-  }
-  const chance=numericChance;
-  const multiplier=numericMultiplier;
-  const success=Math.random()*100<chance;
-  u.balance=Number((Number(u.balance)-s).toFixed(6));u.gamesPlayed++;if(success)u.wins++;save();
-  res.json({success,chance,multiplier,user:u});
+  // Server is authoritative: multiplier is ALWAYS derived from the locked chance.
+  const chance=Number(requestedChance.toFixed(6));
+  const multiplier=Number((100/chance).toFixed(6));
+  const roll=crypto.randomInt(0,1000000)/10000; // 0..99.9999
+  const success=roll<chance;
+  const payout=success?Number((s*multiplier).toFixed(6)):0;
+  u.balance=Number((Number(u.balance)-s+payout).toFixed(6));
+  u.gamesPlayed=Number(u.gamesPlayed||0)+1;
+  if(success)u.wins=Number(u.wins||0)+1;
+  const round={requestId,telegramId:u.id,stake:s,chance,multiplier,roll,success,payout,createdAt:new Date().toISOString()};
+  db.gameRounds[requestId]=round;
+  save();
+  res.json({success,chance,multiplier,roll,payout,user:u,roundId:requestId});
 });
 
 app.post('/api/wallet/deposit',auth,async(req,res)=>{
@@ -100,31 +110,40 @@ app.post('/api/wallet/deposit',auth,async(req,res)=>{
 
 app.post('/api/wallet/withdraw',auth,async(req,res)=>{
   const amount=numericAmount(req.body.amount),provider=req.body.provider;
-  const u=userRecord(req.user);if(!amount)return res.status(400).json({error:'Invalid withdrawal'});
+  const u=userRecord(req.user);
+  if(!amount)return res.status(400).json({error:'Invalid withdrawal'});
   if(u.balance<amount)return res.status(400).json({error:'Недостаточно средств'});
-  const id=`wd-${u.id}-${Date.now()}`;
+  const id=`wd-${u.id}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
   const row={id,provider,telegramId:u.id,amount,status:'pending',createdAt:new Date().toISOString()};db.withdrawals[id]=row;
   try{
+    // Both withdrawal methods are account-to-account transfers. No network or wallet address is requested.
+    u.balance=Number((Number(u.balance)-amount).toFixed(6));save();
     if(provider==='xrocket'){
       if(!XR_TOKEN)return res.status(503).json({error:'xRocket API token is not configured'});
-      const address=String(req.body.address||'').trim(),network=String(req.body.network||'TON').toUpperCase();
-      if(!address)return res.status(400).json({error:'Укажи адрес кошелька'});
-      row.address=address;row.network=network;
-      u.balance-=amount;save();
-      const remote=await xrocketRequest('/api/v1/withdrawals',{clientWithdrawalId:id,network,address,asset:'USDT',amount:String(amount),comment:`Energy Simulator ${id}`,callback:BACKEND_PUBLIC_URL?{callbackUrl:`${BACKEND_PUBLIC_URL}/webhooks/xrocket`,payload:{withdrawalId:id}}:undefined});
-      row.remote=remote;row.remoteId=remote.withdrawalId||remote.id;row.status='created';save();return res.json({message:'Вывод создан',id});
+      const remote=await xrocketRequest('/api/v1/payouts',{
+        clientPayoutId:id,
+        targetType:'telegram_user_id',
+        target:String(u.id),
+        asset:'USDT',
+        amount:String(amount),
+        description:`Energy Simulator withdrawal ${id}`,
+        callback:BACKEND_PUBLIC_URL?{callbackUrl:`${BACKEND_PUBLIC_URL}/webhooks/xrocket`,payload:{withdrawalId:id}}:undefined
+      });
+      row.remote=remote;row.remoteId=remote.payoutId||remote.id;row.status=remote.status||'finished';
+      if(row.status==='finished')u.withdrawalsTotal=Number(u.withdrawalsTotal||0)+amount;
+      save();return res.json({message:'Вывод отправлен через xRocket',id,status:row.status});
     }
     if(provider==='cryptobot'){
       if(!CRYPTO_PAY_TOKEN)return res.status(503).json({error:'CryptoBot API token is not configured'});
-      u.balance-=amount;save();
       const transfer=await cryptoRequest('transfer',{user_id:u.id,asset:'USDT',amount:String(amount),spend_id:id,comment:`Energy Simulator withdrawal ${id}`});
       row.remote=transfer;row.remoteId=transfer.transfer_id;row.status='paid';u.withdrawalsTotal=Number(u.withdrawalsTotal||0)+amount;save();
-      return res.json({message:'Вывод отправлен в CryptoBot',id});
+      return res.json({message:'Вывод отправлен через CryptoBot',id,status:'paid'});
     }
-    res.status(400).json({error:'Unknown provider'});
+    u.balance=Number((Number(u.balance)+amount).toFixed(6));row.status='failed';row.error='Unknown provider';save();
+    return res.status(400).json({error:'Unknown provider'});
   }catch(e){
     if(row.status==='pending'||row.status==='created'){
-      u.balance+=amount;row.status='failed';row.error=e.message;save();
+      u.balance=Number((Number(u.balance)+amount).toFixed(6));row.status='failed';row.error=e.message;save();
     }
     res.status(400).json({error:e.message});
   }
@@ -138,9 +157,13 @@ app.post('/webhooks/xrocket',(req,res)=>{
     const local=clientId&&db.invoices[clientId];
     if(local&&(inv?.status==='paid'||payment?.status==='paid'))creditInvoice(local,inv?.priceAmount||payment?.receiveAmount||local.amount);
   }
-  if(body.type==='withdrawal'){
-    const d=body.data||{};const localId=d.callback?.payload?.withdrawalId;const row=localId&&db.withdrawals[localId];
-    if(row){if(d.status==='COMPLETED'){row.status='paid';const u=db.users[String(row.telegramId)];if(u)u.withdrawalsTotal=Number(u.withdrawalsTotal||0)+Number(row.amount||0);save()}else if(d.status==='FAIL'){const u=db.users[String(row.telegramId)];if(u){u.balance=Number(u.balance||0)+Number(row.amount||0)}row.status='failed';save()}}
+  if(body.type==='payout'){
+    const d=body.data||{};const localId=d.clientPayoutId||d.callback?.payload?.withdrawalId;const row=localId&&db.withdrawals[localId];
+    if(row){
+      const u=db.users[String(row.telegramId)];
+      if(d.status==='finished'&&row.status!=='paid'){row.status='paid';if(u)u.withdrawalsTotal=Number(u.withdrawalsTotal||0)+Number(row.amount||0);save()}
+      else if(d.status==='failed'&&row.status!=='failed'){row.status='failed';if(u)u.balance=Number(u.balance||0)+Number(row.amount||0);save()}
+    }
   }
   res.sendStatus(200);
 });

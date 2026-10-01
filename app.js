@@ -38,7 +38,7 @@ function home(){
   <div class="shelf-caption">@energydrinksim_bot</div></section>`;
 }
 function games(){
-  app.innerHTML=`${head('Игры','Upgrader')}<div id="upgradeMount"></div>`;
+  app.innerHTML=`${head('Игры','')}<div id="upgradeMount"></div>`;
   openUpgrader();
 }
 function icon(name){
@@ -75,13 +75,19 @@ function openUpgrader(){
     <button class="chance-btn ${selectedKey==='p75'?'active':''}" data-type="chance" data-key="75" data-value="${presets['75']??75}">${formatPercent(presets['75']??75)}% <small>X${formatMultiplier(chanceToMultiplier(presets['75']??75))}</small></button>
   </div>
   <button class="primary upgrade-action" id="upgradeBtn">⚡ Апгрейд · ${state.stake.toFixed(2)} USDT</button></div>
-  <div class="settings-panel" id="settings"><div class="settings-title">⚙️ Настройки процентов</div><div class="settings-grid">
+  <div class="settings-panel" id="settings" aria-hidden="true"><div class="settings-title"><span>⚙️ Настройки процентов</span><button class="settings-close" id="settingsClose" aria-label="Закрыть">×</button></div><div class="settings-grid">
     <div class="field"><label>Кнопка 1% — шанс</label><input id="chance1" type="number" min="1" max="95" step="1" value="${presets['1']??1}"></div>
     <div class="field"><label>Кнопка 33% — шанс</label><input id="chance33" type="number" min="1" max="95" step="1" value="${presets['33']??33}"></div>
     <div class="field"><label>Кнопка 75% — шанс</label><input id="chance75" type="number" min="1" max="95" step="1" value="${presets['75']??75}"></div>
-  </div><div class="settings-help">Для X2, X5 и X10 шанс всегда считается математически: 100 ÷ множитель. Для процентных кнопок множитель считается как 100 ÷ шанс.</div><button class="primary" id="saveSettings" style="width:100%;margin-top:9px">Сохранить</button></div>
+  </div><div class="settings-help">Настройки влияют только на кнопки процентов. Сам апгрейд фиксирует шанс и множитель на сервере в момент ставки — изменить их после начала игры невозможно.</div><button class="primary" id="saveSettings" style="width:100%;margin-top:9px">Сохранить</button></div>
   <div class="result muted" id="result">Готов к апгрейду</div></section>`;
   const chanceLabel=document.getElementById('chanceLabel'), multiplierLabel=document.getElementById('multiplierLabel'), wheel=document.getElementById('wheel'), stake=document.getElementById('stake');
+  const setBusy=(busy)=>{
+    document.querySelectorAll('.chance-btn').forEach(b=>b.disabled=busy);
+    stake.disabled=busy;
+    document.getElementById('gear').disabled=busy;
+    if(!busy) document.getElementById('settingsClose')?.removeAttribute('disabled');
+  };
   const applyChoice=(type,value,key)=>{
     if(type==='mult'){
       state.multiplier=Number(value);state.chance=100/state.multiplier;state.choice=`x${state.multiplier}`;
@@ -99,7 +105,9 @@ function openUpgrader(){
   };
   document.querySelectorAll('.chance-btn').forEach(b=>b.onclick=()=>applyChoice(b.dataset.type,b.dataset.value,b.dataset.key));
   stake.oninput=()=>{state.stake=Math.max(0.01,Math.min(1000000,Number(stake.value)||0.01));document.getElementById('upgradeBtn').textContent=`⚡ Апгрейд · ${state.stake.toFixed(2)} USDT`};
-  document.getElementById('gear').onclick=()=>document.getElementById('settings').classList.toggle('open');
+  const settings=document.getElementById('settings');
+  document.getElementById('gear').onclick=()=>{settings.classList.toggle('open');settings.setAttribute('aria-hidden',String(!settings.classList.contains('open')))};
+  document.getElementById('settingsClose').onclick=()=>{settings.classList.remove('open');settings.setAttribute('aria-hidden','true')};
   document.getElementById('saveSettings').onclick=()=>{
     state.chancePresets={
       '1':clampChance(document.getElementById('chance1').value),
@@ -109,29 +117,44 @@ function openUpgrader(){
     localStorage.setItem('energy_upgrader_settings',JSON.stringify({chancePresets:state.chancePresets}));
     const active=document.querySelector('.chance-btn.active');
     if(active?.dataset.type==='chance') applyChoice('chance',state.chancePresets[active.dataset.key],active.dataset.key);
-    openUpgrader();notify('Проценты сохранены');
+    settings.classList.remove('open');settings.setAttribute('aria-hidden','true');
+    notify('Проценты сохранены');
+    openUpgrader();
   };
   document.getElementById('upgradeBtn').onclick=doUpgrade;
-  m.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function clampChance(v){return Math.max(1,Math.min(95,Number(v)||1))}
 function formatPercent(v){return Number.isInteger(Number(v))?String(Number(v)):Number(v).toFixed(2).replace(/0+$/,'').replace(/\.$/,'')}
 async function doUpgrade(){
   const btn=document.getElementById('upgradeBtn'),wheel=document.getElementById('wheel'),result=document.getElementById('result'),target=document.getElementById('targetItem');
   const stake=Math.max(0.01,Number(document.getElementById('stake')?.value)||0);
+  const lockedChance=Number(state.chance);
+  const lockedMultiplier=Number((100/lockedChance).toFixed(6));
+  const requestId=`${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
   state.stake=stake;
   if(state.balance<stake){result.className='result gray';result.textContent=`Нужно ${stake.toFixed(2)} USDT для апгрейда`;notify('Недостаточно баланса');return}
-  const chance=Number(state.chance),multiplier=Number((100/chance).toFixed(6));
   btn.disabled=true;btn.textContent='Проверяем...';result.className='result muted';result.textContent='Проверяем ставку...';
+  setBusy(true);
   let data;
-  try{data=await api('/api/game/upgrade',{method:'POST',body:JSON.stringify({stake,chance,multiplier})});}
-  catch(e){btn.disabled=false;btn.textContent=`⚡ Апгрейд · ${stake.toFixed(2)} USDT`;result.className='result gray';result.textContent=e.message;notify(e.message);return}
-  const success=Boolean(data.success);state.balance=Number(data.user?.balance??(state.balance-stake));state.gamesPlayed=Number(data.user?.gamesPlayed??state.gamesPlayed+1);state.wins=Number(data.user?.wins??(state.wins+(success?1:0)));setBalance();
-  const successAngle=chance*3.6;const targetAngle=success?Math.random()*Math.max(1,successAngle-4)+2:successAngle+Math.random()*Math.max(1,360-successAngle-2)+1;
-  btn.textContent='Крутим...';result.textContent='Колесо вращается...';state.rotation+=1080+(360-targetAngle);wheel.style.transform=`rotate(${state.rotation}deg)`;
+  try{data=await api('/api/game/upgrade',{method:'POST',body:JSON.stringify({stake,chance:lockedChance,multiplier:lockedMultiplier,requestId})});}
+  catch(e){setBusy(false);btn.disabled=false;btn.textContent=`⚡ Апгрейд · ${stake.toFixed(2)} USDT`;result.className='result gray';result.textContent=e.message;notify(e.message);return}
+  const success=Boolean(data.success);
+  const serverChance=Number(data.chance);
+  const serverMultiplier=Number(data.multiplier);
+  state.balance=Number(data.user?.balance??(state.balance-stake));state.gamesPlayed=Number(data.user?.gamesPlayed??state.gamesPlayed+1);state.wins=Number(data.user?.wins??state.wins+(success?1:0));setBalance();
+  const roll=Number(data.roll??0);
+  const successAngle=serverChance*3.6;
+  const targetAngle=success
+    ? 180-successAngle/2+(roll/100)*successAngle
+    : 180+successAngle/2+(roll/100)*(360-successAngle);
+  btn.textContent='Крутим...';result.textContent='Колесо вращается...';
+  const currentRotation=state.rotation;
+  const normalized=((targetAngle%360)+360)%360;
+  state.rotation=currentRotation+1080+((360-normalized-currentRotation)%360+360)%360;
+  wheel.style.transform=`rotate(${state.rotation}deg)`;
   setTimeout(()=>{
-    btn.disabled=false;btn.textContent=`⚡ Апгрейд · ${state.stake.toFixed(2)} USDT`;
-    if(success){target.className='item';target.innerHTML=`<div class="can blue">E+</div><b>Energy Pro</b><small>X${multiplier}</small>`;result.className='result';result.textContent=`АПГРЕЙД УСПЕШЕН · X${multiplier}`;notify('Апгрейд успешен')}
+    setBusy(false);btn.disabled=false;btn.textContent=`⚡ Апгрейд · ${stake.toFixed(2)} USDT`;
+    if(success){target.className='item';target.innerHTML=`<div class="can blue">E+</div><b>Energy Pro</b><small>X${serverMultiplier}</small>`;result.className='result';result.textContent=`АПГРЕЙД УСПЕШЕН · X${serverMultiplier}`;notify(`Успех · +${money(stake*serverMultiplier)} USDT`)}
     else{target.className='item empty-result';target.innerHTML='<div class="can">?</div><b>Пусто</b><small>результата нет</small>';result.className='result gray';result.textContent='Неудача — результат пустой';notify('Неудача — выпало пустое поле')}
   },3200);
 }
@@ -162,21 +185,18 @@ async function loadAdmin(){
 }
 function walletModal(mode){
   document.querySelector('.modal')?.remove();const dep=mode==='deposit';
-  const isCrypto=state.provider==='cryptobot';
+  const recipient=esc(getUser().username?'@'+getUser().username:String(idSafe()));
   document.body.insertAdjacentHTML('beforeend',`<div class="modal"><div class="modal-card"><div class="modal-title"><h3>${dep?'Пополнить баланс':'Вывести средства'}</h3><button class="close" id="closeModal">×</button></div>
   <div class="provider-row"><button class="provider ${state.provider==='cryptobot'?'active':''}" data-p="cryptobot">CryptoBot</button><button class="provider ${state.provider==='xrocket'?'active':''}" data-p="xrocket">xRocket</button></div>
-  <div class="field" style="margin-top:10px"><label>Сумма USDT</label><input id="walletAmount" type="number" min="1" step="0.01" placeholder="10"></div>
-  ${!dep&&!isCrypto?'<div class="field" style="margin-top:10px"><label>Сеть</label><select id="walletNetwork"><option value="TON">TON</option><option value="TRX">TRX</option><option value="BSC">BSC</option><option value="ETH">ETH</option><option value="SOL">SOL</option></select></div>':''}
-  ${!dep&&!isCrypto?'<div class="field" style="margin-top:10px"><label>Адрес кошелька</label><input id="walletAddress" placeholder="USDT address"></div>':''}
-  ${!dep&&isCrypto?`<div class="wallet-recipient">Получатель CryptoBot: <b>${esc(idSafe())}</b><br><small>Вывод будет отправлен на ваш Telegram ID через Crypto Pay.</small></div>`:''}
-  <div class="wallet-status">${dep?'После оплаты провайдер подтвердит реальный платёж, и сумма будет зачислена на баланс.':'Средства списываются при успешной отправке вывода. При ошибке сервер возвращает сумму.'}</div>
-  <div class="modal-actions"><button class="wallet-btn" id="cancel">Отмена</button><button class="primary" id="submit">${dep?'Создать инвойс':'Создать вывод'}</button></div></div></div>`);
+  <div class="field" style="margin-top:10px"><label>Сумма ${dep?'USDT':'$'}</label><input id="walletAmount" type="number" min="1" step="0.01" placeholder="10"></div>
+  ${!dep?`<div class="wallet-recipient">Получатель: <b>${recipient}</b><br><small>Вывод выполняется автоматически через выбранный API. Сети и адрес кошелька не нужны.</small></div>`:''}
+  <div class="wallet-status">${dep?'После оплаты провайдер подтвердит реальный платёж, и сумма будет зачислена на баланс.':'После успешной отправки сумма списывается с баланса. При ошибке сервер возвращает её автоматически.'}</div>
+  <div class="modal-actions"><button class="wallet-btn" id="cancel">Отмена</button><button class="primary" id="submit">${dep?'Создать инвойс':'Вывести'}</button></div></div></div>`);
   document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{state.provider=b.dataset.p;walletModal(mode)});
   document.getElementById('closeModal').onclick=closeModal;document.getElementById('cancel').onclick=closeModal;
   document.getElementById('submit').onclick=async()=>{
     const amount=+document.getElementById('walletAmount').value;if(!amount||amount<=0){notify('Укажи сумму');return}
     const body={provider:state.provider,amount};
-    if(!dep&&state.provider==='xrocket'){body.address=document.getElementById('walletAddress').value.trim();body.network=document.getElementById('walletNetwork').value;if(!body.address){notify('Укажи адрес');return}}
     try{const d=await api(dep?'/api/wallet/deposit':'/api/wallet/withdraw',{method:'POST',body:JSON.stringify(body)});
       if(d.payUrl){tg?.openLink?.(d.payUrl);notify('Инвойс создан')}else {notify(d.message||'Вывод создан');await syncUser();render()} closeModal()
     }catch(e){notify(e.message)}
